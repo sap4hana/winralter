@@ -24,7 +24,7 @@ namespace winralter {
 		if (strcat_s(current_path, MAX_PATH, fn_ini) != 0)
 			return std::string(fn_ini + 1);
 
-		/* Ïèøåì â äèðåêòîðèþ »Ìîè äîêóìåíòû«, åñëè íå íàøëè ini-ôàéë */
+		/* ÃÃ¨Ã¸Ã¥Ã¬ Ã¢ Ã¤Ã¨Ã°Ã¥ÃªÃ²Ã®Ã°Ã¨Ã¾ Â»ÃŒÃ®Ã¨ Ã¤Ã®ÃªÃ³Ã¬Ã¥Ã­Ã²Ã»Â«, Ã¥Ã±Ã«Ã¨ Ã­Ã¥ Ã­Ã Ã¸Ã«Ã¨ ini-Ã´Ã Ã©Ã« */
 		if (!std::filesystem::exists(std::string(current_path)) && config_file_type != 1) {
 			CHAR my_documents[MAX_PATH]{};
 			const HRESULT result = SHGetFolderPathA(
@@ -76,8 +76,8 @@ namespace winralter {
 		if (command.IsEmpty())
 			return false;
 
-		/* Ïîñëå ïóòè ê .exe â êàâû÷êàõ - èäóò àðãóìåíòû
-		   Åñëè êîìàíäà áåç êàâû÷åê, òî ïåðâûé ïðîáåë ñ÷èòàåì ðàçäåëèòåëåì îò ïàðàìåòðà */
+		/* ÃÃ®Ã±Ã«Ã¥ Ã¯Ã³Ã²Ã¨ Ãª .exe Ã¢ ÃªÃ Ã¢Ã»Ã·ÃªÃ Ãµ - Ã¨Ã¤Ã³Ã² Ã Ã°Ã£Ã³Ã¬Ã¥Ã­Ã²Ã»
+		   Ã…Ã±Ã«Ã¨ ÃªÃ®Ã¬Ã Ã­Ã¤Ã  Ã¡Ã¥Ã§ ÃªÃ Ã¢Ã»Ã·Ã¥Ãª, Ã²Ã® Ã¯Ã¥Ã°Ã¢Ã»Ã© Ã¯Ã°Ã®Ã¡Ã¥Ã« Ã±Ã·Ã¨Ã²Ã Ã¥Ã¬ Ã°Ã Ã§Ã¤Ã¥Ã«Ã¨Ã²Ã¥Ã«Ã¥Ã¬ Ã®Ã² Ã¯Ã Ã°Ã Ã¬Ã¥Ã²Ã°Ã  */
 		std::wstring text(command.GetString());
 		std::wstring executable;
 		std::wstring parameters;
@@ -198,35 +198,56 @@ namespace winralter {
 		CoUninitialize();
 	}
 
-	void cwr_helper::load_cmd_from_file(ccombo_completion* m_combobox) {
-		m_combobox->ResetContent();
-		std::ifstream input_stream(std::filesystem::path(permanent_config), std::ios::binary);
-		if (!input_stream.is_open()) {
-			if (std::filesystem::exists(std::filesystem::path(permanent_config)))
-				AfxMessageBox(L"Unable to read the command history.", MB_OK | MB_ICONWARNING);
-			return;
-		}
-
-		std::string line;
-		while (std::getline(input_stream, line)) {
-			if (!line.empty() && line.back() == '\r')
-				line.pop_back();
-			if (line.empty())
-				continue;
-			CStringW command(CA2W(line.c_str(), CP_UTF8));
-			if (m_combobox->FindStringExact(-1, command) == CB_ERR)
-				m_combobox->AddString(command);
-		}
-
-		/* The most recently used command is stored as the last history item */
-		CStringW last_command;
-		const int count = m_combobox->GetCount();
-		if (count > 0 && m_combobox->GetLBTextLen(count - 1) != CB_ERR) {
-			m_combobox->GetLBText(count - 1, last_command);
-			m_combobox->SetWindowText(last_command);
-		}
-		else
-			m_combobox->SetWindowText(L"");
+	void cwr_helper::load_cmd_from_file(ccombo_completion* m_combobox)
+	{
+	    m_combobox->ResetContent();
+	
+	    std::ifstream input_stream(
+	        std::filesystem::path(permanent_config),
+	        std::ios::binary);
+	
+	    if (!input_stream.is_open()) {
+	        if (std::filesystem::exists(
+	                std::filesystem::path(permanent_config)))
+	            AfxMessageBox(
+	                L"Unable to read the command history.",
+	                MB_OK | MB_ICONWARNING);
+	        return;
+	    }
+	
+	    std::vector<CStringW> commands;
+	    std::string line;
+	
+	    while (std::getline(input_stream, line)) {
+	        if (!line.empty() && line.back() == '\r')
+	            line.pop_back();
+	
+	        if (line.empty())
+	            continue;
+	
+	        CStringW command(CA2W(line.c_str(), CP_UTF8));
+	
+	        bool duplicate = false;
+	        for (const auto& existing : commands) {
+	            if (existing == command) {
+	                duplicate = true;
+	                break;
+	            }
+	        }
+	
+	        if (!duplicate)
+	            commands.push_back(command);
+	    }
+	
+	    /* Add newest commands first */
+	    for (auto it = commands.rbegin(); it != commands.rend(); ++it)
+	        m_combobox->AddString(*it);
+	
+	    /* Select the newest command as the current combo-box item */
+	    if (m_combobox->GetCount() > 0)
+	        m_combobox->SetCurSel(0);
+	    else
+	        m_combobox->SetWindowText(L"");
 	}
 
 	bool cwr_helper::save_cmd_to_file(const CString& cmd_to_save) {
